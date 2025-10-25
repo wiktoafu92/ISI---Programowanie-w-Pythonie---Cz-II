@@ -1,7 +1,7 @@
 import random
 
-from sqlalchemy import create_engine, String, Integer, Boolean, Float, DateTime, select, delete, update
-from sqlalchemy.orm import declarative_base, Mapped, mapped_column, Session
+from sqlalchemy import create_engine, String, Integer, Boolean, Float, DateTime, select, delete, update, ForeignKey
+from sqlalchemy.orm import declarative_base, Mapped, mapped_column, Session, relationship
 from datetime import datetime
 
 engine = create_engine('sqlite:///experiments.db', echo=True)
@@ -17,12 +17,17 @@ class Experiment(Base):
     type: Mapped[int] = mapped_column(Integer)
     finished: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    datapoints: Mapped[list['DataPoint']] = relationship(back_populates='experiment')
+
 class DataPoint(Base):
     __tablename__ = 'datapoint'
 
     id: Mapped[int] = mapped_column(primary_key=True)
     real_value: Mapped[float] = mapped_column(Float)
     target_value: Mapped[float] = mapped_column(Float)
+
+    experiment_id: Mapped[int] = mapped_column(ForeignKey('experiment.id'))
+    experiment: Mapped['Experiment'] = relationship(back_populates='datapoints')
 
 Base.metadata.create_all(engine)
 
@@ -34,7 +39,7 @@ with Session(engine) as session:
     session.add_all(experiments)
 
     datapoints = [
-        DataPoint(real_value=random.uniform(0, 100), target_value=random.uniform(0, 100))
+        DataPoint(real_value=random.uniform(0, 100), target_value=random.uniform(0, 100), experiment_id=1)
         for _ in range(10)
     ]
     session.add_all(datapoints)
@@ -50,7 +55,8 @@ with Session(engine) as session:
     datapoints = session.scalars(select(DataPoint)).all()
     print(len(datapoints))
     for dp in datapoints:
-        print(f'id: {dp.id}, real_value: {dp.real_value:.2f}, target_value: {dp.target_value:.2f}')
+        print(f'id: {dp.id}, real_value: {dp.real_value:.2f}, target_value: {dp.target_value:.2f}, '
+              f'experiment_id: {dp.experiment_id}')
 
     stmt = update(Experiment).values(finished=True)
     session.execute(stmt)
