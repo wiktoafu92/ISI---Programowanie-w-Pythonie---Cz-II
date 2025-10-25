@@ -1,5 +1,7 @@
-from sqlalchemy import create_engine, String, Integer, Boolean, Float, DateTime
-from sqlalchemy.orm import declarative_base, Mapped, mapped_column
+import random
+
+from sqlalchemy import create_engine, String, Integer, Boolean, Float, DateTime, select, delete, update
+from sqlalchemy.orm import declarative_base, Mapped, mapped_column, Session
 from datetime import datetime
 
 engine = create_engine('sqlite:///experiments.db', echo=True)
@@ -23,3 +25,39 @@ class DataPoint(Base):
     target_value: Mapped[float] = mapped_column(Float)
 
 Base.metadata.create_all(engine)
+
+with Session(engine) as session:
+    experiments = [
+        Experiment(title='A', type=random.randint(1, 5)),
+        Experiment(title='B', type=random.randint(1, 5))
+    ]
+    session.add_all(experiments)
+
+    datapoints = [
+        DataPoint(real_value=random.uniform(0, 100), target_value=random.uniform(0, 100))
+        for _ in range(10)
+    ]
+    session.add_all(datapoints)
+
+    session.commit()
+
+    experiments = session.scalars(select(Experiment)).all()
+    print(len(experiments))
+    for exp in experiments:
+        print(f'id: {exp.id}, title: {exp.title}, created_at: {exp.created_at}, type: {exp.type}, '
+              f'finished: {exp.finished}')
+
+    datapoints = session.scalars(select(DataPoint)).all()
+    print(len(datapoints))
+    for dp in datapoints:
+        print(f'id: {dp.id}, real_value: {dp.real_value:.2f}, target_value: {dp.target_value:.2f}')
+
+    stmt = update(Experiment).values(finished=True)
+    session.execute(stmt)
+    session.commit()
+
+    stmt_exp = delete(Experiment)
+    stmt_dp = delete(DataPoint)
+    session.execute(stmt_exp)
+    session.execute(stmt_dp)
+    session.commit()
